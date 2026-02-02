@@ -19,7 +19,7 @@ async function initDb() {
     }
     
     db = new SQL.Database(data);
-    await initTables();
+    initTables();
   }
   
   return db;
@@ -32,9 +32,8 @@ function saveDb() {
   }
 }
 
-async function initTables() {
-  const database = await initDb();
-  database.exec(`
+function initTables() {
+  db.exec(`
     CREATE TABLE IF NOT EXISTS devices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       device_id TEXT UNIQUE NOT NULL,

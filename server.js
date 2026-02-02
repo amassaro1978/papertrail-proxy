@@ -5,7 +5,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 
-const { registerDevice, getDeviceByToken, getUsage, incrementUsage, updatePlan, getResetDate } = require('./db');
+const { initDb, registerDevice, getDeviceByToken, getUsage, incrementUsage, updatePlan, getResetDate } = require('./db');
 const { authenticate, checkUsage, FREE_TIER_LIMIT } = require('./auth');
 const { analyzeDocument, generateDraft } = require('./claude');
 
@@ -188,8 +188,23 @@ app.post('/api/subscription/verify', authenticate, async (req, res) => {
 
 // --- Start ---
 
-app.listen(PORT, () => {
-  console.log(`🚀 PaperTrail Proxy running on port ${PORT}`);
-  console.log(`   Health: http://localhost:${PORT}/health`);
-  console.log(`   API key: ${process.env.ANTHROPIC_API_KEY ? '✅ loaded' : '❌ MISSING'}`);
-});
+async function startServer() {
+  try {
+    // Initialize database first
+    console.log('📦 Initializing database...');
+    await initDb();
+    console.log('✅ Database ready');
+    
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`🚀 PaperTrail Proxy running on port ${PORT}`);
+      console.log(`   Health: http://localhost:${PORT}/health`);
+      console.log(`   API key: ${process.env.ANTHROPIC_API_KEY ? '✅ loaded' : '❌ MISSING'}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
