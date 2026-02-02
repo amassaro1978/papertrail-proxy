@@ -1,28 +1,40 @@
-const sqlite3 = require('sqlite3').verbose();
+const initSqlJs = require('sql.js');
+const fs = require('fs');
 const path = require('path');
-const { promisify } = require('util');
 
 const DB_PATH = path.join(__dirname, 'papertrail.db');
 
+let SQL;
 let db;
 
-function getDb() {
-  if (!db) {
-    db = new sqlite3.Database(DB_PATH);
-    // Promisify the methods we need
-    db.getAsync = promisify(db.get.bind(db));
-    db.runAsync = promisify(db.run.bind(db));
-    db.allAsync = promisify(db.all.bind(db));
-    db.execAsync = promisify(db.exec.bind(db));
-    
-    initTables();
+async function initDb() {
+  if (!SQL) {
+    SQL = await initSqlJs();
   }
+  
+  if (!db) {
+    let data;
+    if (fs.existsSync(DB_PATH)) {
+      data = fs.readFileSync(DB_PATH);
+    }
+    
+    db = new SQL.Database(data);
+    await initTables();
+  }
+  
   return db;
 }
 
+function saveDb() {
+  if (db) {
+    const data = db.export();
+    fs.writeFileSync(DB_PATH, Buffer.from(data));
+  }
+}
+
 async function initTables() {
-  const db = getDb();
-  await db.execAsync(`
+  const database = await initDb();
+  database.exec(`
     CREATE TABLE IF NOT EXISTS devices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       device_id TEXT UNIQUE NOT NULL,
@@ -43,6 +55,7 @@ async function initTables() {
     CREATE INDEX IF NOT EXISTS idx_devices_token ON devices(token);
     CREATE INDEX IF NOT EXISTS idx_usage_device ON usage(device_id);
   `);
+  saveDb();
 }
 
 // Get the reset date (first of current month)
@@ -52,55 +65,101 @@ function getResetDate() {
 }
 
 async function registerDevice(deviceId, token) {
-  const db = getDb();
-  const existing = await db.getAsync('SELECT * FROM devices WHERE device_id = ?', [deviceId]);
+  const database = await initDb();
   
-  if (existing) {
+  // Check if device exists
+  const stmt = database.prepare('SELECT * FROM devices WHERE device_id = ?');
+  const existing = stmt.getAsObject([deviceId]);
+  stmt.free();
+  
+  if (existing.device_id) {
     return existing;
   }
 
-  await db.runAsync('INSERT INTO devices (device_id, token, plan) VALUES (?, ?, ?)', [deviceId, token, 'free']);
-  return await db.getAsync('SELECT * FROM devices WHERE device_id = ?', [deviceId]);
+  // Insert new device
+  const insertStmt = database.prepare('INSERT INTO devices (device_id, token, plan) VALUES (?, ?, ?)');
+  insertStmt.run([deviceId, token, 'free']);
+  insertStmt.free();
+  
+  saveDb();
+  
+  // Return the new device
+  const selectStmt = database.prepare('SELECT * FROM devices WHERE device_id = ?');
+  const result = selectStmt.getAsObject([deviceId]);
+  selectStmt.free();
+  
+  return result;
 }
 
 async function getDeviceByToken(token) {
-  const db = getDb();
-  return await db.getAsync('SELECT * FROM devices WHERE token = ?', [token]);
+  const database = await initDb();
+  const stmt = database.prepare('SELECT * FROM devices WHERE token = ?');
+  const result = stmt.getAsObject([token]);
+  stmt.free();
+  
+  return result.device_id ? result : null;
 }
 
 async function getUsage(deviceId) {
-  const db = getDb();
+  const database = await initDb();
   const resetDate = getResetDate();
   
-  let usage = await db.getAsync('SELECT * FROM usage WHERE device_id = ? AND reset_date = ?', [deviceId, resetDate]);
+  const stmt = database.prepare('SELECT * FROM usage WHERE device_id = ? AND reset_date = ?');
+  let usage = stmt.getAsObject([deviceId, resetDate]);
+  stmt.free();
   
-  if (!usage) {
-    await db.runAsync('INSERT INTO usage (device_id, actions_used, reset_date) VALUES (?, 0, ?)', [deviceId, resetDate]);
-    usage = await db.getAsync('SELECT * FROM usage WHERE device_id = ? AND reset_date = ?', [deviceId, resetDate]);
+  if (!usage.device_id) {
+    // Create new usage record
+    const insertStmt = database.prepare('INSERT INTO usage (device_id, actions_used, reset_date) VALUES (?, 0, ?)');
+    insertStmt.run([deviceId, resetDate]);
+    insertStmt.free();
+    
+    saveDb();
+    
+    // Get the inserted record
+    const selectStmt = database.prepare('SELECT * FROM usage WHERE device_id = ? AND reset_date = ?');
+    usage = selectStmt.getAsObject([deviceId, resetDate]);
+    selectStmt.free();
   }
   
   return usage;
 }
 
 async function incrementUsage(deviceId) {
-  const db = getDb();
+  const database = await initDb();
   const resetDate = getResetDate();
   
   // Ensure row exists
   await getUsage(deviceId);
   
-  await db.runAsync('UPDATE usage SET actions_used = actions_used + 1 WHERE device_id = ? AND reset_date = ?', [deviceId, resetDate]);
+  // Increment usage
+  const updateStmt = database.prepare('UPDATE usage SET actions_used = actions_used + 1 WHERE device_id = ? AND reset_date = ?');
+  updateStmt.run([deviceId, resetDate]);
+  updateStmt.free();
+  
+  saveDb();
+  
   return await getUsage(deviceId);
 }
 
 async function updatePlan(deviceId, plan) {
-  const db = getDb();
-  await db.runAsync('UPDATE devices SET plan = ? WHERE device_id = ?', [plan, deviceId]);
-  return await db.getAsync('SELECT * FROM devices WHERE device_id = ?', [deviceId]);
+  const database = await initDb();
+  
+  const updateStmt = database.prepare('UPDATE devices SET plan = ? WHERE device_id = ?');
+  updateStmt.run([plan, deviceId]);
+  updateStmt.free();
+  
+  saveDb();
+  
+  const selectStmt = database.prepare('SELECT * FROM devices WHERE device_id = ?');
+  const result = selectStmt.getAsObject([deviceId]);
+  selectStmt.free();
+  
+  return result;
 }
 
 module.exports = {
-  getDb,
+  initDb,
   registerDevice,
   getDeviceByToken,
   getUsage,
