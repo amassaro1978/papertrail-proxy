@@ -35,7 +35,7 @@ const perDeviceLimiter = rateLimit({
 });
 app.use('/api/', perDeviceLimiter);
 
-// --- Health ---
+// --- Health (no database dependency) ---
 
 app.get('/health', (_req, res) => {
   console.log('🏥 Health check requested');
@@ -45,6 +45,17 @@ app.get('/health', (_req, res) => {
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV || 'development'
   });
+});
+
+// --- Database Health (separate endpoint) ---
+
+app.get('/health/db', async (_req, res) => {
+  try {
+    await initDb();
+    res.json({ status: 'ok', database: 'connected' });
+  } catch (error) {
+    res.status(500).json({ status: 'error', database: 'failed', error: error.message });
+  }
 });
 
 // --- 1. Register device ---
@@ -196,15 +207,11 @@ app.post('/api/subscription/verify', authenticate, async (req, res) => {
 
 async function startServer() {
   try {
-    // Initialize database first
-    console.log('📦 Initializing database...');
-    await initDb();
-    console.log('✅ Database ready');
-    
-    // Start server
+    // Start server immediately (database will initialize on first request)
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 PaperTrail Proxy running on port ${PORT}`);
       console.log(`   Health: http://localhost:${PORT}/health`);
+      console.log(`   Database: lazy initialization on first API call`);
       console.log(`   API key: ${process.env.ANTHROPIC_API_KEY ? '✅ loaded' : '❌ MISSING'}`);
     });
   } catch (error) {
