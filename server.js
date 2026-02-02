@@ -38,7 +38,13 @@ app.use('/api/', perDeviceLimiter);
 // --- Health ---
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', version: '1.0.0' });
+  console.log('🏥 Health check requested');
+  res.json({ 
+    status: 'ok', 
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development'
+  });
 });
 
 // --- 1. Register device ---
@@ -196,7 +202,7 @@ async function startServer() {
     console.log('✅ Database ready');
     
     // Start server
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 PaperTrail Proxy running on port ${PORT}`);
       console.log(`   Health: http://localhost:${PORT}/health`);
       console.log(`   API key: ${process.env.ANTHROPIC_API_KEY ? '✅ loaded' : '❌ MISSING'}`);
