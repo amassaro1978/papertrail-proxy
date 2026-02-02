@@ -43,7 +43,7 @@ app.get('/health', (_req, res) => {
 
 // --- 1. Register device ---
 
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
     const { deviceId } = req.body;
     if (!deviceId || typeof deviceId !== 'string' || deviceId.length > 256) {
@@ -51,8 +51,8 @@ app.post('/api/auth/register', (req, res) => {
     }
 
     const token = uuidv4();
-    const device = registerDevice(deviceId, token);
-    const usage = getUsage(device.device_id);
+    const device = await registerDevice(deviceId, token);
+    const usage = await getUsage(device.device_id);
     const actionsRemaining = device.plan === 'pro' ? -1 : Math.max(0, FREE_TIER_LIMIT - usage.actions_used);
 
     res.json({
@@ -84,9 +84,9 @@ app.post('/api/analyze', authenticate, checkUsage, async (req, res) => {
     }
 
     const tasks = await analyzeDocument(image, mimeType);
-    incrementUsage(req.device.device_id);
+    await incrementUsage(req.device.device_id);
 
-    const updatedUsage = getUsage(req.device.device_id);
+    const updatedUsage = await getUsage(req.device.device_id);
     const actionsRemaining = req.device.plan === 'pro' ? -1 : Math.max(0, FREE_TIER_LIMIT - updatedUsage.actions_used);
 
     res.json({
@@ -119,9 +119,9 @@ app.post('/api/draft', authenticate, checkUsage, async (req, res) => {
     }
 
     const draft = await generateDraft(task, draftType);
-    incrementUsage(req.device.device_id);
+    await incrementUsage(req.device.device_id);
 
-    const updatedUsage = getUsage(req.device.device_id);
+    const updatedUsage = await getUsage(req.device.device_id);
     const actionsRemaining = req.device.plan === 'pro' ? -1 : Math.max(0, FREE_TIER_LIMIT - updatedUsage.actions_used);
 
     res.json({
@@ -142,9 +142,9 @@ app.post('/api/draft', authenticate, checkUsage, async (req, res) => {
 
 // --- 4. Usage stats ---
 
-app.get('/api/usage', authenticate, (req, res) => {
+app.get('/api/usage', authenticate, async (req, res) => {
   try {
-    const usage = getUsage(req.device.device_id);
+    const usage = await getUsage(req.device.device_id);
     const actionsRemaining = req.device.plan === 'pro' ? -1 : Math.max(0, FREE_TIER_LIMIT - usage.actions_used);
 
     // Calculate next reset date (first of next month)
@@ -165,7 +165,7 @@ app.get('/api/usage', authenticate, (req, res) => {
 
 // --- 5. Verify subscription (placeholder) ---
 
-app.post('/api/subscription/verify', authenticate, (req, res) => {
+app.post('/api/subscription/verify', authenticate, async (req, res) => {
   try {
     const { receipt } = req.body;
     if (!receipt || typeof receipt !== 'string') {
@@ -173,7 +173,7 @@ app.post('/api/subscription/verify', authenticate, (req, res) => {
     }
 
     // Placeholder — always succeeds. Real IAP validation comes later.
-    const device = updatePlan(req.device.device_id, 'pro');
+    const device = await updatePlan(req.device.device_id, 'pro');
 
     res.json({
       success: true,
