@@ -5,7 +5,10 @@ const MODEL = 'claude-sonnet-4-20250514';
 
 function getApiKey() {
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error('ANTHROPIC_API_KEY not set');
+  if (!key) {
+    console.error('❌ ANTHROPIC_API_KEY not set in environment variables');
+    throw new Error('ANTHROPIC_API_KEY not set');
+  }
   return key;
 }
 

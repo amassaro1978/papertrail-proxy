@@ -116,6 +116,7 @@ app.post('/api/analyze', authenticate, checkUsage, async (req, res) => {
     });
   } catch (err) {
     console.error('Analyze error:', err);
+    if (err.message === 'ANTHROPIC_API_KEY not set') return res.status(500).json({ error: 'Server configuration error: API key not set' });
     if (err.status === 401) return res.status(502).json({ error: 'Invalid API key configured on server' });
     if (err.status === 429) return res.status(502).json({ error: 'Upstream rate limit. Try again shortly.' });
     res.status(500).json({ error: 'Failed to analyze document' });
@@ -151,6 +152,7 @@ app.post('/api/draft', authenticate, checkUsage, async (req, res) => {
     });
   } catch (err) {
     console.error('Draft error:', err);
+    if (err.message === 'ANTHROPIC_API_KEY not set') return res.status(500).json({ error: 'Server configuration error: API key not set' });
     if (err.status === 401) return res.status(502).json({ error: 'Invalid API key configured on server' });
     if (err.status === 429) return res.status(502).json({ error: 'Upstream rate limit. Try again shortly.' });
     res.status(500).json({ error: 'Failed to generate draft' });
