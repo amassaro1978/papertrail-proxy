@@ -17,7 +17,6 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
-    "sql.js": "^1.13.0",
-    "uuid": "^13.0.0"
+    "sql.js": "^1.13.0"
   }
 }

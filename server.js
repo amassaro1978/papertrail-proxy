@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 const { initDb, registerDevice, getDeviceByToken, getUsage, incrementUsage, updatePlan, getResetDate } = require('./db');
 const { authenticate, checkUsage, FREE_TIER_LIMIT } = require('./auth');
@@ -67,7 +67,7 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'deviceId is required (string, max 256 chars)' });
     }
 
-    const token = uuidv4();
+    const token = randomUUID();
     const device = await registerDevice(deviceId, token);
     const usage = await getUsage(device.device_id);
     const actionsRemaining = device.plan === 'pro' ? -1 : Math.max(0, FREE_TIER_LIMIT - usage.actions_used);
