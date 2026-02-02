@@ -1,21 +1,28 @@
-# PaperTrail Proxy Deployment
+# Deployment Options
 
-## Quick Railway Deployment
+## Railway (Current Issue)
+The app crashes after 47 seconds due to missing environment variable.
 
-1. **Sign up at Railway.app** with GitHub
-2. **Create New Project** → Deploy from GitHub repo
-3. **Set Environment Variable**: `ANTHROPIC_API_KEY=sk-ant-api03-...`
-4. **Deploy!** Railway will auto-deploy from your repo
+**Fix:** Add environment variable in Railway dashboard:
+- Variable: `ANTHROPIC_API_KEY`  
+- Value: (copy from local .env file)
 
-## Environment Variables Needed
-- `ANTHROPIC_API_KEY` - Your Claude API key (required)
-- `PORT` - Auto-set by Railway 
-- `RATE_LIMIT_PER_MIN` - Optional (default: 10)
-- `FREE_TIER_LIMIT` - Optional (default: 10)
+## Alternative Deployment Options
 
-## After Deployment
-1. Copy your Railway URL (e.g., `https://papertrail-proxy-production.up.railway.app`)  
-2. Update your React Native app to use this URL instead of `localhost:3334`
+### Render
+1. Connect GitHub repo
+2. Set environment variable in dashboard  
+3. Auto-deploy
 
-## Health Check
-Your deployed proxy will be healthy at: `https://your-url.railway.app/health`
+### Docker (Local/VPS)
+```bash
+docker build -t papertrail-proxy .
+docker run -p 3334:3334 -e ANTHROPIC_API_KEY="your-key-here" papertrail-proxy
+```
+
+### Heroku
+```bash
+heroku create papertrail-proxy
+heroku config:set ANTHROPIC_API_KEY="your-key-here"
+git push heroku main
+```
